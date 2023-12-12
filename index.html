@@ -1,0 +1,163 @@
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Place Autocomplete Address Form</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:400,500" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="container mt-5">
+        <form id="address-form" autocomplete="off">
+            <h2 class="title mb-4">Address form for Australia</h2>
+            <div class="form-group">
+                <label for="ship-address">Address</label>
+                <input id="ship-address" name="ship-address" class="form-control" required autocomplete="off" />
+            </div>
+            <button type="button" class="btn btn-primary" onclick="checkAvailability()">Check Availability</button>
+            <input type="reset" class="btn btn-secondary" value="Clear form" />
+            <div id="loader" class="mt-3" style="display: none;">
+                <img src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/0.16.1/images/loader-large.gif"
+                    alt="Loading...">
+            </div>
+            <ul id="availability-result" class="mt-3 list-group"></ul>
+        </form>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAWsBLOkwahB8qc87YUBiAtp7kDEOA-utE&callback=initAutocomplete&libraries=places&v=weekly"
+        defer></script>
+
+    <script>
+        let autocomplete;
+        let addressField;
+
+        function initAutocomplete() {
+            addressField = document.querySelector("#ship-address");
+
+            autocomplete = new google.maps.places.Autocomplete(addressField, {
+                componentRestrictions: { country: ["au"] },
+                fields: ["address_components", "geometry"],
+                types: ["address"],
+            });
+
+            addressField.focus();
+            autocomplete.addListener("place_changed", fillInAddress);
+        }
+
+        async function checkAvailability() {
+            const address = document.querySelector("#ship-address").value;
+            const url = `https://nbnco-address-check.p.rapidapi.com/nbn_address?address=${encodeURIComponent(address)}`;
+            const options = {
+                method: 'GET',
+                headers: {
+                    'X-RapidAPI-Key': '70dd02ee76msh3f9488491a29541p193972jsn968f8715adc3',
+                    'X-RapidAPI-Host': 'nbnco-address-check.p.rapidapi.com'
+                },
+            };
+
+            // Display loader
+            document.getElementById("loader").style.display = "block";
+
+            try {
+                const response = await fetch(url, options);
+                const result = await response.text();
+                displayResults(result);
+                console.log(result);
+            } catch (error) {
+                console.error(error);
+            } finally {
+                // Hide loader
+                document.getElementById("loader").style.display = "none";
+            }
+        }
+
+        function fillInAddress() {
+            const place = autocomplete.getPlace();
+            let address = "";
+
+            for (const component of place.address_components) {
+                const componentType = component.types[0];
+
+                switch (componentType) {
+                    case "street_number": {
+                        address = `${component.long_name} ${address}`;
+                        break;
+                    }
+
+                    case "route": {
+                        address += component.short_name;
+                        break;
+                    }
+
+                    // Add other address components as needed
+
+                }
+            }
+
+            addressField.value = address;
+        }
+
+        function displayResults(result) {
+    const resultContainer = document.querySelector("#availability-result");
+
+    try {
+        const data = JSON.parse(result);
+        const addressDetail = data.addressDetail;
+        const servingArea = data.servingArea;
+
+        // Clear previous results
+        resultContainer.innerHTML = "";
+
+        // Check if address is available
+        if (addressDetail && servingArea) {
+            // Create and append address details
+            const addressDetailList = document.createElement("ul");
+            for (const [key, value] of Object.entries(addressDetail)) {
+                const listItem = document.createElement("li");
+                listItem.innerHTML = `<strong>${key}:</strong> ${value}`;
+                addressDetailList.appendChild(listItem);
+            }
+            resultContainer.appendChild(addressDetailList);
+
+            // Create and append serving area details
+            const servingAreaList = document.createElement("ul");
+            for (const [key, value] of Object.entries(servingArea)) {
+                const listItem = document.createElement("li");
+                listItem.innerHTML = `<strong>${key}:</strong> ${value}`;
+                servingAreaList.appendChild(listItem);
+            }
+            resultContainer.appendChild(servingAreaList);
+        } else {
+            // Display a message if no results found
+            const noResultsItem = document.createElement("li");
+            noResultsItem.textContent = "Service not available at this address.";
+            noResultsItem.className = "list-group-item list-group-item-danger";
+            resultContainer.appendChild(noResultsItem);
+        }
+    } catch (error) {
+        console.error("Error parsing JSON:", error);
+
+        // Display an error message
+        const errorItem = document.createElement("li");
+        errorItem.textContent = "Error processing the result.";
+        errorItem.className = "list-group-item list-group-item-danger";
+        resultContainer.appendChild(errorItem);
+    }
+}
+
+
+        window.initAutocomplete = initAutocomplete;
+    </script>
+</body>
+
+</html>
